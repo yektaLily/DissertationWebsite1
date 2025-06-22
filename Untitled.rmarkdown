@@ -1,0 +1,1181 @@
+```{r envSetup, include = FALSE, echo = FALSE}
+knitr::opts_chunk$set(
+    echo = TRUE,
+    message = FALSE,
+    warning = FALSE,
+    out.width = "65%",
+    fig.align = "center",
+    comment = ">"
+    )
+```
+
+
+
+```{r, echo=FALSE, warning=FALSE}
+##library(tidyverse)
+library(corrr)
+library(psych)
+library(lavaan)
+#library(kableExtra)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(survey)
+library(haven)
+library(rempsyc)
+library(broom)
+library(report)
+library(effectsize)
+library(aod)
+library(readr)
+#library(tidymodels)
+library(stargazer)
+library(forcats)
+library(ggcorrplot)
+library(caret)
+library(knitr)
+library(ROCR)
+library(jtools)
+#=library(car)
+library(xtable)
+#library(texreg)
+#library(svyVGAM)
+library(glmnet)
+library(ggpubr)
+library(lme4)
+library(nlme)
+library(weights)
+library(miscTools)
+library(systemfit)
+library(multcomp)
+require(ggplot2)
+require(GGally)
+require(reshape2)
+#require(compiler)
+#require(parallel)
+#require(boot)
+require(lattice)
+library(HLMdiag)
+#library(DHARMa)
+library(car) #for the Levene test which we will not discuss here
+library(Matrix)
+library(brms)
+library(margins)
+library(performance)
+library(ggnewscale)
+library(ggeffects)
+library(bayestestR) # for hypothesis testing
+library(brmsmargins)
+library(ggeffects)
+library(marginaleffects)
+library(effects)
+library(margins)
+library(modelr)
+library(plm)
+library(effectsize)
+library(aod)
+library(readr)
+library(tidymodels)
+library(stargazer)
+library(forcats)
+library(ggcorrplot)
+library(caret)
+library(knitr)
+library(ROCR)
+library(jtools)
+#=library(car)
+library(xtable)
+#library(texreg)
+#library(svyVGAM)
+library(glmnet)
+library(ggpubr)
+library(foreign)
+library(AER)
+library(lme4)
+library(brms)
+library(glmnet)
+library(ggpubr)
+library(formatR)
+library(pglm)
+library(acqr)
+```
+
+
+```{r}
+ds20 <- read_dta("data/cius2020_2022nov18_en.dta")
+```
+
+```{r}
+ds <- ds20
+```
+
+
+```{r}
+ds <- ds %>% 
+    mutate(
+        devSM = case_when(
+        dv_010a == 1 ~ 1, #yes
+        dv_010a == 2 ~ 0, #no
+        .default = -1, #any valid skip and not stated 
+        )
+    )
+
+ds <- ds %>% 
+   filter(devSM == 1)
+```
+
+```{r}
+dim(ds)
+```
+
+
+```{r}
+ds <- ds %>% filter(ui_050d < 3)
+ds <- ds %>% filter(g_edu < 5)
+ds <- ds %>% filter(emp < 7)
+ds <- ds %>% filter(ui_010c < 8)
+ds <- ds %>% filter(cv_010h < 8)
+ds <- ds %>% filter(ui_055a < 97)
+ds <- ds %>% filter(ui_060a < 97)
+ds <- ds %>% filter(ui_045a < 97)
+ds <- ds %>% filter(sm_030a < 97)
+ds <- ds %>% filter(ts_010a < 8)
+ds <- ds %>% filter(ts_010b < 8)
+ds <- ds %>% filter(fd_020a < 13)
+ds <- ds %>% filter(fd_030a < 8)
+```
+
+```{r}
+dim(ds)
+```
+
+
+```{r}
+ds <- ds %>%
+    mutate(
+        #timeline : past 3 months 
+        mBanking = case_when(
+            ui_050d == 1 ~ 1, 
+            ui_050d == 2 ~ 0,
+            .default = -1
+        ),
+        
+        phoneCheck = case_when(
+            sm_030a == 1 ~ 6,
+            sm_030a == 2 ~ 5,
+            sm_030a == 3 ~ 4,
+            sm_030a == 4 ~ 3,
+            sm_030a == 5 ~ 2, 
+            sm_030a == 6 ~ 1,
+            .default = 96
+            
+        )
+    )
+
+
+ds %>% count(mBanking)
+
+```
+
+
+```{r}
+ds <- ds %>% filter(phoneCheck < 10)
+```
+
+```{r}
+ds <- ds %>% mutate(
+    rel_frnd_sat = case_when(
+        ts_010a == 1 ~ 1, #completely dissatisfied 
+        ts_010a == 2 ~ 2, 
+        ts_010a == 3 ~ 3,
+        ts_010a == 4 ~ 4,
+        ts_010a == 5 ~ 5, #completely satisfied 
+        .default = 90
+    ),
+    
+    rel_fam_sat = case_when(
+        ts_010b == 1 ~ 1, #completely dissatisfied 
+        ts_010b == 2 ~ 2, 
+        ts_010b == 3 ~ 3,
+        ts_010b == 4 ~ 4,
+        ts_010b == 5 ~ 5, #completely satisfied 
+        .default = 90
+    ),
+    
+    # life_sat = case_when(
+    #     fd_020a == 1 ~ 1, #very dissatisfied
+    #     fd_020a == 2 ~ 2,
+    #     fd_020a == 3 ~ 3,
+    #     fd_020a == 4 ~ 4,
+    #     fd_020a == 5 ~ 5,
+    #     fd_020a == 6 ~ 6,
+    #     fd_020a == 7 ~ 7,
+    #     fd_020a == 8 ~ 8,
+    #     fd_020a == 9 ~ 9,
+    #     fd_020a == 10 ~ 10,
+    #     fd_020a == 11 ~ 11, #very satisfied 
+    #     .default = 90
+    # ),
+    
+    mental_health = case_when(
+        fd_030a == 1 ~ 5, #excellent 
+        fd_030a == 2 ~ 4, 
+        fd_030a == 3 ~ 3,
+        fd_030a == 4 ~ 2,
+        fd_030a == 5 ~ 1, #poor
+        .default = 90
+    )
+)
+
+
+```
+
+
+```{r}
+#ds <- ds %>% filter(general_health < 15)
+ds <- ds %>% filter(mental_health < 15)
+#ds <- ds %>% filter(life_sat < 15)
+ds <- ds %>% filter(rel_frnd_sat < 15)
+ds <- ds %>% filter(rel_fam_sat < 15)
+```
+
+
+```{r}
+ds <- ds %>% filter(g_hcomp < 5)
+ds <- ds %>% filter(g_edu < 5)
+```
+
+```{r}
+ds <- ds %>% mutate(
+    id = pumfid,
+    province = province, 
+    LOC = luc_rst, #rural, urban, PE! 
+    AGE = age_grp,
+    SEX = gender,
+    ABO = g_abm, #is aboriginal 
+    LAN = lan_g01,
+    EMP = emp,
+    STU = ed_g10, #is a student? --- don't include it! 
+    EDU = g_edu,
+    MINORITY = g_vismin, #is visible minority?
+    DIS = dis_g10,
+    FAM = g_hcomp, #type of family: children under 18 
+    IMM = imm_gsta,
+    HSIZE = g_hsize, #household size
+    INC = hincquin
+    
+)
+```
+
+
+
+```{r}
+ds %>% count(INC)
+```
+```{r}
+ds <- ds %>% mutate(LOC = as.double(LOC))
+```
+
+```{r}
+ds <- ds %>% filter(LOC < 3)
+ds <- ds %>% filter(ABO < 3)
+ds <- ds %>% filter(LAN < 5)
+ds <- ds %>% filter(EMP < 3)
+#ds <- ds %>% filter(STU < 3)
+ds <- ds %>% filter(MINORITY < 3)
+ds <- ds %>% filter(DIS < 3)
+ds <- ds %>% filter(FAM < 5)
+ds <- ds %>% filter(IMM < 3)
+```
+
+```{r}
+ds %>% count(mBanking)
+```
+
+```{r}
+ds <- ds %>% mutate(
+    SNS = case_when(
+        ui_010c == 1 ~ 1,
+        ui_010c == 2 ~ 0
+    )
+    
+)
+
+```
+
+
+```{r}
+ds <- rename(ds, 
+       MH = mental_health, 
+       FAMSAT = rel_fam_sat,
+       FRISAT = rel_frnd_sat,
+       SD = phoneCheck
+       )
+
+ds <- ds %>% filter(MH < 10)
+ds <- ds %>% filter(FAMSAT < 10)
+ds <- ds %>% filter(FRISAT < 10)
+ds <- ds %>% filter(SD < 10)
+```
+
+```{r}
+ds %>% count(mBanking)
+```
+
+
+```{r}
+ds <- ds %>% 
+    dplyr::select(id, 
+                  mBanking, SD, FAMSAT, FRISAT, MH, SNS,
+                  province, LOC, AGE, SEX, ABO, LAN, EMP, EDU, MINORITY, DIS, FAM, IMM, HSIZE, INC, wtpg)
+                  
+                  
+```
+
+# EXPLORING DATA 
+
+## SCREENING 
+```{r}
+ggplot(ds, aes(x = MH, y = as.factor(mBanking))) + 
+    geom_boxplot(
+        outlier.colour = "red",
+        outlier.shape = 16,
+        outlier.size = 2,
+        notch = F
+    )
+```
+
+Descriptive statistics:
+```{r}
+ds <- ds %>% 
+    mutate(
+        id = as.factor(id),
+        MB_f = as.factor(mBanking),
+        SNS_f = as.factor(SNS),
+        province_f = as.factor(province),
+        AGE = as.integer(AGE), 
+        EDU_f = as.factor(EDU),
+        FAM_f = as.factor(FAM),
+        INC_f = as.factor(INC),
+        SEX_f = as.factor(SEX),
+        EMP_f = as.factor(EMP),
+        IMM_f = as.factor(IMM),
+        SEX_f = fct_recode(
+            SEX_f,
+            "0" = "2",
+            "1" = "1"
+        ),
+        EMP_f = fct_recode(
+            EMP_f,
+            "0" = "2",
+            "1" = "1"
+        ),
+        IMM_f = fct_recode(
+            IMM_f,
+            "0" = "2",
+            "1" = "1" 
+        ),
+        
+        NUM_SEX = as.integer(SEX_f),
+        NUM_SEX = ifelse(
+            NUM_SEX == 2,
+            1,
+            0
+        ),
+        NUM_EMP = as.integer(EMP_f),
+        NUM_EMP = ifelse(
+            NUM_EMP == 1,
+            1,
+            0
+        ),
+        NUM_IMM = as.integer(IMM_f),
+        NUM_IMM = ifelse(
+            NUM_IMM == 1,
+            1,
+            0
+        ),
+    )
+```
+
+```{r}
+dsrb <- psych::describe(ds %>% dplyr::select(
+    mBanking, SD, FAMSAT, FRISAT, MH, SNS, AGE, NUM_SEX, NUM_EMP, EDU, FAM, NUM_IMM, INC
+), type = 2)
+
+```
+
+```{r}
+dsrb
+```
+
+
+```{r}
+ddd <- as.data.frame(dsrb) %>% dplyr::select(c(mean, sd, median, min, max, skew, kurtosis))
+```
+
+```{r}
+xtable(ddd, digits = 2)
+```
+Skew $<3.0$ and Kurtosis $<10.0$, those that violate this are: 
+
+
+Na's:
+```{r}
+sum(is.na(ds))
+```
+
+## RELATIONSHIPS: Visualizations, Contingency, Correlations
+
+> Mental Health and Mbanking:
+
+```{r}
+ggplot(data = ds, aes(x = MH, y = wtpg)) +
+            geom_col(
+            aes(fill = as.factor(mBanking)), stat = "identity", color = "black", position = position_dodge(0.9)) +
+            fill_palette("Pastel1") + 
+            xlab("Mental Health") +
+            ylab("Frequencies") + labs(fill = "Mbanking")
+```
+
+
+> MH and controls: AGE, SEX, EMP, EDU, FAM, IMM, INC
+
+```{r, fig.width=15, fig.height=10}
+gg_fam <- ggplot(data = ds , aes(MH, fill = as.factor(FAM))) + geom_bar(position = "fill") + labs(x = "Mental Health", y = "Percentage (fill)", fill = 'FAMILY') + fill_palette("Pastel1")
+
+gg_age <- ggplot(data = ds , aes(MH, fill = as.factor(AGE))) + geom_bar(position = "fill") + labs(x = "Mental Health", y = "Percentage (fill)", fill = 'AGE') + fill_palette("Pastel1")
+
+gg_edu <- ggplot(data = ds , aes(MH, fill = as.factor(EDU))) + geom_bar(position = "fill") + labs(x = "Mental Health", y = "Percentage (fill)", fill = 'EDU') + fill_palette("Pastel1")
+
+gg_inc <- ggplot(data = ds , aes(MH, fill = as.factor(INC))) + geom_bar(position = "fill") + labs(x = "Mental Health", y = "Percentage (fill)", fill = 'INC') + fill_palette("Pastel1")
+
+gg_sex <- ggplot(data = ds , aes(MH, fill = as.factor(SEX))) + geom_bar(position = "fill") + labs(x = "Mental Health", y = "Percentage (fill)", fill = 'SEX') + fill_palette("Pastel1")
+
+gg_emp <- ggplot(data = ds , aes(MH, fill = as.factor(EMP))) + geom_bar(position = "fill") + labs(x = "Mental Health", y = "Percentage (fill)", fill = 'EMP') + fill_palette("Pastel1")
+
+gg_imm <- ggplot(data = ds , aes(MH, fill = as.factor(IMM))) + geom_bar(position = "fill") + labs(x = "Mental Health", y = "Percentage (fill)", fill = 'Immigrant') + fill_palette("Pastel1")
+
+
+ggarrange(
+    gg_fam, gg_age, gg_edu, gg_inc, gg_sex, gg_emp, gg_imm,
+    labels = c("FAM", "AGE", "EDU", "INC", "SEX", "EMP", "IMM"),
+    ncol = 3,
+    nrow = 3
+    
+) #gg3, gg4, ncol = 2, nrow = 2)
+```
+
+
+
+> MH and other variables:  SD, FAMSAT, FRISAT, SNS 
+
+```{r, fig.width=15, fig.height=10}
+gg_frisat <- ggplot(data = ds , aes(MH, fill = as.factor(FRISAT))) + geom_bar(position = "fill") + labs(x = "Mental Health", y = "Percentage (fill)", fill = 'FRISAT') + fill_palette("Pastel1")
+
+gg_famsat <- ggplot(data = ds , aes(MH, fill = as.factor(FAMSAT))) + geom_bar(position = "fill") + labs(x = "Mental Health", y = "Percentage (fill)", fill = 'FAMSAT') + fill_palette("Pastel1")
+
+gg_sd <- ggplot(data = ds , aes(MH, fill = as.factor(SD))) + geom_bar(position = "fill") + labs(x = "Mental Health", y = "Percentage (fill)", fill = 'SD') + fill_palette("Pastel1")
+
+gg_sns <- ggplot(data = ds , aes(MH, fill = as.factor(SNS))) + geom_bar(position = "fill") + labs(x = "Mental Health", y = "Percentage (fill)", fill = 'SNS') + fill_palette("Pastel1")
+
+ggarrange(
+    gg_frisat, gg_famsat, gg_sd, gg_sns,
+    labels = c("FRISAT", "FAMSAT", "SD", "SNS"),
+    ncol = 2,
+    nrow = 2
+    
+) #gg3, gg4, ncol = 2, nrow = 2)
+```
+```{r}
+glimpse(ds)
+```
+
+
+
+```{r}
+ds <- ds %>% 
+    mutate(
+        id = as.factor(id),
+        MB_f = as.factor(mBanking),
+        SNS_f = as.factor(SNS),
+        AGE = as.integer(AGE), 
+        province_f = as.factor(province),
+        EDU_f = as.factor(EDU),
+        FAM_f = as.factor(FAM),
+        INC_f = as.factor(INC),
+        SEX_f = as.factor(SEX),
+        EMP_f = as.factor(EMP),
+        IMM_f = as.factor(IMM),
+        SEX_f = fct_recode(
+            SEX_f,
+            "0" = "2",
+            "1" = "1"
+        ),
+        EMP_f = fct_recode(
+            EMP_f,
+            "0" = "2",
+            "1" = "1"
+        ),
+        IMM_f = fct_recode(
+            IMM_f,
+            "0" = "2",
+            "1" = "1" 
+        )
+    )
+```
+
+
+```{r}
+glimpse(ds)
+```
+```{r}
+colnames(ds)
+```
+
+Contingency table: 
+```{r}
+p1 <- ds %>% group_by(province, MH) %>% dplyr::count(mBanking)
+```
+
+
+```{r}
+p1 %>% filter(province == 59)
+```
+		
+```{r}
+ds %>% count(mBanking)
+```
+
+
+
+#### Correlation Matrix 
+```{r}
+sle <- ds %>% dplyr::select(mBanking, SD, FAMSAT, FRISAT, SNS, AGE, SEX, EMP, EDU, FAM, INC, MH)
+corM <- Hmisc::rcorr(as.matrix(sle))
+```
+
+```{r}
+corM
+```
+
+
+Because it is too large, I will visualize it: 
+```{r}
+reg_corM <- as.matrix(corM$r)
+```
+
+```{r}
+corrplot::COL2(diverging = c("RdBu", "BrBG", "PiYG", "PRGn", "PuOr", "RdYlBu"), n = 200)
+```
+
+
+
+```{r, fig.height=4, fig.width=5}
+# Increase the size of the plot
+#options(repr.plot.width = 15, repr.plot.height = 15)
+# 
+colnames(reg_corM) <- c("mBanking", "SD", "FAMSAT", "FRISAT", "SNS", "AGE", "SEX", "EMP", "EDU", "FAM", "INC", "MH")
+# 
+rownames(reg_corM) <- c("mBanking", "SD", "FAMSAT", "FRISAT", "SNS", "AGE", "SEX", "EMP", "EDU", "FAM", "INC", "MH")
+# 
+corrplot::corrplot(reg_corM, p.mat = corM$P, method = "color", type = "upper", insig = 'label_sig', sig.level = c(0.001, 0.01, 0.05), pch.cex = 0.9, order = 'AOE', tl.col = "black", tl.cex = 1, diag = F, col = corrplot::COL2('PuOr'))
+
+```
+
+
+
+```{r}
+calc_prob <- function(x){return(x/(1+x))}
+calc_or <- function(x){exp(x)}
+```
+
+
+
+# MODELING 
+Grouping FAMSAT and FRISAT: 
+```{r}
+ds %>% count(FAMSAT)
+```
+```{r}
+ds %>% count(FRISAT)
+```
+
+
+```{r}
+ds <- ds %>% mutate(
+    RQ = FAMSAT + FRISAT
+)
+```
+
+
+```{r}
+ds %>% count(RQ)
+```
+Setting references based on the most populous group:
+```{r}
+ds %>% count(SNS_f)
+```
+
+```{r}
+ds <- ds %>% 
+    mutate(
+        SEX_factor_Fem = relevel(SEX_f, ref = '0'),
+        SEX_factor_Mal = relevel(SEX_f, ref = '1'),
+        # 
+        EMP_factor_not = relevel(EMP_f, ref = '0'),
+        EMP_factor_Emp = relevel(EMP_f, ref = '1'),
+        FAM_factor_1 = relevel(FAM_f, ref = '1'),
+        FAM_factor_2 = relevel(FAM_f, ref = '2'),
+        FAM_factor_3 = relevel(FAM_f, ref = '3'),
+        FAM_factor_4 = relevel(FAM_f, ref = '4'),
+        # IMM
+        IMM_factor_Imm = relevel(IMM_f, ref = '1'),
+        IMM_factor_non = relevel(IMM_f, ref = '0'),
+        # SNS 
+        SNS_factor_notuse = relevel(SNS_f, ref = '0'),
+        SNS_factor_use = relevel(SNS_f, ref = '1')
+    )
+```
+
+
+
+
+
+
+
+
+### Testing whether mixed effect is needed: 
+The model has to include the following variables: 
+- DV : mBanking 
+- IVs --- controls : AGE, SEX_f, EMP_f, EDU, FAM_f, IMM_f, INC
+- IVs --- predictors : SD, MH, SNS_f, RQ 
+- grouping: province, id or weights. 
+
+> Mean centering all continuous variables: 
+
+```{r}
+ds <- ds %>% 
+    mutate(
+        AGE_c = AGE - mean(AGE),
+        EDU_c = EDU - mean(EDU),
+        INC_c = INC - mean(INC),
+        MH_c = MH - mean(MH),
+        SD_c = SD - mean(SD),
+        RQ_c = RQ - mean(RQ)
+    )
+```
+
+Standard regression model:     
+```{r}
+glm_model <- glm(
+    mBanking ~ MH_c + SD_c + SNS_factor_use + RQ_c + AGE_c + SEX_factor_Fem + EMP_factor_Emp + EDU_c + FAM_factor_2 + IMM_factor_non + INC_c, 
+    data = ds,
+    family = "binomial"
+)
+```
+
+
+```{r}
+fixed_model <- glmer(
+    mBanking ~ MH_c + SD_c + SNS_factor_use + RQ_c + AGE_c + SEX_factor_Fem + EMP_factor_Emp + EDU_c + FAM_factor_2 + IMM_factor_non + INC_c + (1 | province),
+    data = ds,
+    family = binomial(),
+    control = glmerControl(optimizer = "bobyqa")
+)
+```
+
+
+```{r}
+anova(glm_model, fixed_model, test = "Chisq")
+```
+
+```{r}
+test_performance(glm_model, fixed_model)
+```
+
+
+```{r}
+random_model <- glmer(
+    mBanking ~ MH_c + SD_c + SNS_factor_use + RQ_c + AGE_c + SEX_factor_Fem + EMP_factor_Emp + EDU_c + FAM_factor_2 + IMM_factor_non + INC_c + (1 + MH_c + SD_c + SNS_factor_use + RQ_c + AGE_c + SEX_factor_Fem + EMP_factor_Emp + EDU_c + FAM_factor_2 + IMM_factor_non + INC_c | province),
+    data = ds,
+    family = binomial(),
+    control = glmerControl(optimizer = "bobyqa")
+)
+```
+
+```{r}
+random_model_MH <- glmer(
+    mBanking ~ MH_c + SD_c + SNS_factor_use + RQ_c + AGE_c + SEX_factor_Fem + EMP_factor_Emp + EDU_c + FAM_factor_2 + IMM_factor_non + INC_c + (1 + MH_c | province),
+    data = ds,
+    family = binomial(),
+    control = glmerControl(optimizer = "bobyqa")
+)
+```
+
+
+
+```{r}
+fixed_model_int <- glmer(
+    mBanking ~ MH_c + SD_c + SNS_factor_use + RQ_c + AGE_c + SEX_factor_Fem + EMP_factor_Emp + EDU_c + FAM_factor_2 + IMM_factor_non + INC_c + MH_c:RQ_c + MH_c:SD_c + MH_c:SNS_factor_use + (1 | province),
+    data = ds,
+    family = binomial(),
+    control = glmerControl(optimizer = "bobyqa")
+)
+```
+
+
+
+```{r}
+summ(
+    fixed_model_int,
+    scale = F,
+    pvals = T,
+    exp = F, 
+    digits = 3,
+    #part.corr = T, #Print partial (labeled "partial.r") and semipartial (labeled "part.r")
+    #confint = getOption("summ-confint", FALSE),
+    #ci.width = getOption("summ-ci.width", 0.95),
+    #vifs = T,
+)
+```
+
+
+```{r}
+anova(fixed_model, fixed_model_int)
+```
+
+
+```{r}
+model_performance(fixed_model_int)
+```
+
+
+Hausman: 
+```{r}
+coefs_fixed <- coef(fixed_model)
+coefs_rand <- coef(random_model) 
+coefs_rand_MH <- coef(random_model_MH)
+
+
+coefs_fixed_df <- as.data.frame(coefs_fixed$province)
+coefs_rand_df <- as.data.frame(coefs_rand$province)
+coefs_rand_df_MH <- as.data.frame(coefs_rand_MH$province)
+
+```
+
+```{r}
+coef_diffs <- coefs_fixed_df - coefs_rand_df
+coefs_diff_MH <- coefs_fixed_df - coefs_rand_df_MH
+
+
+coef_diffs_matrix <- as.matrix(coef_diffs)
+coef_diffs_matrix_MH <- as.matrix(coefs_diff_MH)
+```
+
+
+```{r}
+V1 <-  vcov(fixed_model) - vcov(random_model)
+V1_mh <- vcov(fixed_model) - vcov(random_model_MH)[2,2]
+```
+
+```{r}
+V1 <- as.matrix(V1)
+V1_mh <- as.matrix(V1_mh)
+```
+
+
+```{r}
+dim(coef_diffs)
+dim(V1)
+dim(coef_diffs_matrix_MH)
+dim(V1_mh)
+```
+
+
+```{r}
+V1_inv <- solve(V1)
+V1_mh_inv <- solve(V1_mh)
+```
+
+
+```{r}
+tt <- t(coef_diffs_matrix) %*% coef_diffs_matrix
+tt2 <- t(coef_diffs_matrix_MH) %*% coef_diffs_matrix_MH
+```
+
+```{r}
+H1 <- tt %*% V1_inv 
+H1
+```
+
+```{r}
+chisq_ <- qchisq(p = .05, df = 13, lower.tail = FALSE)
+chisq_
+```
+```{r}
+qr(V1_mh)$rank
+```
+
+```{r}
+H1 > chisq_ #reject H0: the fixed model is better.  
+```
+
+```{r}
+H2 <- tt2  %*% V1_mh_inv
+```
+
+```{r}
+H2[2] > chisq_ #reject H0: the fixed model is better.  
+```
+```{r}
+H1
+```
+
+
+```{r}
+H2[2]
+```
+
+```{r}
+H1
+```
+
+
+```{r}
+pchisq(H1, df = 13)
+```
+
+
+```{r}
+anova(fixed_model, random_model)
+```
+
+
+```{r}
+coefs_fixed <- coef(fixed_model)
+coefs_rando <- coef(random_model)
+
+coefs_fixed_df <- as.data.frame(coefs_fixed$province)
+coefs_rando_df <- as.data.frame(coefs_rando$province)
+
+```
+
+2. Subtract Random Effects model coefficients from Fixed Effect model, per province. This gives you the core term of the Hausman test: 
+```{r}
+coefs_diff <- coefs_fixed_df - coefs_rando_df
+
+coefs_diff
+```
+
+```{r}
+coef_diffs_matrix <- as.matrix(coefs_diff)
+coef_diffs_matrix
+
+```
+
+
+```{r}
+beta_diff <- as.vector(coef_diffs_matrix)  # column vector
+beta_diff
+```
+
+
+3. Estimate the difference in the variance-covariance matrices of the coefficient estimates. 
+```{r}
+V_diff <- as.matrix(vcov(fixed_model) - vcov(random_model))
+V_diff
+```
+
+
+Just checking that the matrix multiplications make sense: 
+```{r}
+#dim(coef_diffs)
+#dim(V1)
+dim(t(coef_diffs_matrix))
+dim(solve(V_diff))
+dim(coef_diffs_matrix)
+dim(V_diff)
+```
+
+They do! So, calculate $H$:
+
+```{r}
+```
+
+
+```{r}
+H <- coef_diffs_matrix %*% solve(V_diff) %*% t(coef_diffs_matrix)
+H
+```
+
+
+This is the actual critical $\chi^2$ value at degrees of freedom 13 (for 14 covariates), in fact, I can check: 
+
+```{r}
+qr(V_diff)$rank
+```
+
+```{r}
+chisq_critical <- qchisq(p = .05, df = 14, lower.tail = FALSE)
+chisq_critical
+```
+
+If $H1 > \chi^2$ then reject the null hypothesis that adding random effects makes the model better. This just means, fixed effect model is better. 
+```{r}
+H > chisq_critical #reject H0: the fixed model is better.  
+```
+
+The p-value: 
+```{r}
+pchisq(H, df = 14, lower.tail = FALSE)
+```
+
+```{r}
+print(predict_response(fixed_model,
+      terms = c("MH_c", "province"), margin = "empirical"), 
+      n = Inf)
+```
+
+
+```{r}
+margins_summary(fixed_model, 
+    at = list(province = c(10, 12, 13, 24, 35, 46, 47, 48, 59)))
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+### MODEL RESULTS:
+
+```{r}
+fixed_model0 <- glmer(
+    mBanking ~ MH_c + SD_c + SNS_factor_use + RQ_c + AGE_c + SEX_factor_Fem + EMP_factor_Emp + EDU_c + FAM_factor_2 + IMM_factor_not + INC_c + (1 | province),
+    data = ds,
+    family = binomial(),
+    control = glmerControl(optimizer = "bobyqa")
+)
+```
+
+
+```{r}
+summ(
+    fixed_model0,
+    scale = F,
+    pvals = T,
+    exp = T, 
+    digits = 3,
+    #part.corr = T, #Print partial (labeled "partial.r") and semipartial (labeled "part.r")
+    #confint = getOption("summ-confint", FALSE),
+    #ci.width = getOption("summ-ci.width", 0.95),
+    #vifs = T,
+)
+```
+
+
+```{r}
+ds2 <- ds
+```
+
+```{r}
+ds2 <- ds2 %>% 
+    mutate(
+        province_f_coded = fct_recode(
+            province_f,
+            'NL' = '10',
+            'NS' = '12', 
+            'NB' = '13',
+            'QB' = '24',
+            'ON' = '35', 
+            'MN' = '46', 
+            'SK' = '47', 
+            'AL' = '48', 
+            'BC' = '59'
+        )
+    )
+```
+
+
+
+```{r}
+d2 <- ds20
+```
+
+```{r}
+d2 <- d2 %>% mutate(
+    ha_030a = case_when(
+        ha_030a == 1 ~ 6,
+        ha_030a == 2 ~ 5,
+        ha_030a == 3 ~ 4,
+        ha_030a == 4 ~ 3,
+        ha_030a == 5 ~ 2,
+        ha_030a == 6 ~ 1,
+        .default = 1
+    )
+)
+```
+
+
+
+```{r}
+ds <- ds %>% mutate(
+        SEX_factor_Mal = relevel(SEX_f, ref = '1'),
+        EMP_factor_Uem = relevel(EMP_f, ref = '0'),
+        FAM_factor_1 = relevel(FAM_f, ref = '1'),
+        IMM_factor_yes = relevel(IMM_f, ref = '1'),
+        SNS_factor_noUse = relevel(SNS_f, ref = '0')
+)
+```
+
+```{r}
+fixed_model_SNSsns0 <- glmer(
+    mBanking ~ MH_c * SNS_factor_noUse + SD_c + FAMSAT_c + FRISAT_c + AGE_c + SEX_factor_Fem + EMP_factor_Emp + EDU_c + FAM_factor_2 + IMM_factor_not + INC_c + (1 | province),
+    data = ds,
+    family = binomial(),
+    control = glmerControl(optimizer = "bobyqa")
+)
+```
+
+```{r}
+summ(
+    fixed_modelSNS,
+    scale = F,
+    pvals = T,
+    exp = T, 
+    digits = 3,
+    #part.corr = T, #Print partial (labeled "partial.r") and semipartial (labeled "part.r")
+    #confint = getOption("summ-confint", FALSE),
+    #ci.width = getOption("summ-ci.width", 0.95),
+    #vifs = T,
+)
+```
+
+
+```{r}
+library(ggeffects)
+```
+
+
+
+
+```{r}
+ds <- ds %>% mutate(
+    MHF = ifelse(
+        MH == 1,
+        1, #poor
+        2 #good
+    ),
+    MHF = as.factor(MHF),
+    MHF_1 = relevel(MHF, ref = 1),
+    MHF_2 = relevel(MHF, ref = 2)
+    
+)
+```
+
+
+```{r fig.width=10, fig.height=10}
+g_age <-  ggplot(ds, aes(AGE, mBanking, color = as.factor(MHF))) +
+                  #facet_wrap(~Ethnicity) +
+                  stat_summary(fun = mean, geom = "point") +
+                  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
+                  theme_set(theme_bw(base_size = 10)) +
+                  theme(legend.position = "top") +
+                  labs(x = "AGE Group", y = "Observed Probabilty of mobile banking") +
+                  scale_color_manual(values = c("gray20", "gray70"))
+
+g_edu <-  ggplot(ds, aes(EDU, mBanking, color = as.factor(MHF))) +
+                  #facet_wrap(~Ethnicity) +
+                  stat_summary(fun = mean, geom = "point") +
+                  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
+                  theme_set(theme_bw(base_size = 10)) +
+                  theme(legend.position = "top") +
+                  labs(x = "EDUCATION", y = "Observed Probabilty of mobile banking") +
+                  scale_color_manual(values = c("gray20", "gray70"))
+
+g_inc <-  ggplot(ds, aes(INC, mBanking, color = as.factor(MHF))) +
+                  #facet_wrap(~Ethnicity) +
+                  stat_summary(fun = mean, geom = "point") +
+                  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
+                  theme_set(theme_bw(base_size = 10)) +
+                  theme(legend.position = "top") +
+                  labs(x = "INCOME", y = "Observed Probabilty of mobile banking") +
+                  scale_color_manual(values = c("gray20", "gray70"))
+
+ggarrange(g_age, g_edu, g_inc, ncol = 2, nrow = 2)
+  
+```
+
+```{r}
+ggplot(ds, aes(AGE, mBanking, color = MHF)) +
+                  #facet_wrap(~Ethnicity) +
+                  stat_summary(fun = mean, geom = "point") +
+                  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
+                  theme_set(theme_bw(base_size = 10)) +
+                  theme(legend.position = "top") +
+                  labs(x = "AGE Group", y = "Observed Probabilty of mobile banking") +
+                  scale_color_manual(values = c("gray20", "#f55142"))
+```
+  
+  
+```{r}
+ggplot(ds, aes(EDU, mBanking, color = MHF)) +
+                  #facet_wrap(~Ethnicity) +
+                  stat_summary(fun = mean, geom = "point") +
+                  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
+                  theme_set(theme_bw(base_size = 10)) +
+                  theme(legend.position = "top") +
+                  labs(x = "EDUCATION", y = "Observed Probabilty of mobile banking") +
+                  scale_color_manual(values = c("gray20", "#f55142"))
+```
+  
+```{r}
+rcorr(ds$mBanking, ds$INC)
+```
+
+```{r}
+ggplot(ds, aes(INC, mBanking, color = MHF)) +
+                  #facet_wrap(~Ethnicity) +
+                  stat_summary(fun = mean, geom = "point") +
+                  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
+                  theme_set(theme_bw(base_size = 10)) +
+                  theme(legend.position = "top") +
+                  labs(x = "INCOME", y = "Observed Probabilty of mobile banking") +
+                  scale_color_manual(values = c("black", "#f55142"))
+```
+
+  
+  
+  
+```{r}
+# set contrasts
+options(contrasts  =c("contr.treatment", "contr.poly"))
+# extract distribution summaries for all potential variables
+data.dist <- datadist(ds)
+# store distribution summaries for all potential variables
+options(datadist = "data.dist")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
