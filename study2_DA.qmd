@@ -168,9 +168,9 @@ Data I need:
 * Province (for grouping)
 
 ```{r}
-ds20 <- read_dta("data/cius2020_2022nov18_en.dta")
-ds <- ds20
-
+#ds20 <- read_dta("data/cius2020_2022nov18_en.dta")
+#ds <- ds20
+ds <- read.csv("ds.csv")
 ```
 
 Select only those who use smartphones: 
